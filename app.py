@@ -7,9 +7,21 @@ Launch:
 
 from __future__ import annotations
 
+import os
+
+# Cap PyTorch / OpenMP threads BEFORE importing torch.
+# Rationale: on shared-CPU hosts (Railway, etc.) PyTorch's default of "use all
+# cores it sees" causes thread contention rather than speedup. Empirically 4
+# threads is a sweet spot for this 1.5B model on shared vCPUs.
+# Override via OPF_NUM_THREADS env var if needed.
+_NUM_THREADS = os.environ.get("OPF_NUM_THREADS", "4")
+os.environ.setdefault("OMP_NUM_THREADS", _NUM_THREADS)
+os.environ.setdefault("MKL_NUM_THREADS", _NUM_THREADS)
+os.environ.setdefault("OPENBLAS_NUM_THREADS", _NUM_THREADS)
+os.environ.setdefault("NUMEXPR_NUM_THREADS", _NUM_THREADS)
+
 import argparse
 import gc
-import os
 import sys
 import time
 from pathlib import Path
@@ -25,6 +37,16 @@ try:
 except ImportError:
     st.error("torch is required (installed via opf). Run: pip install -r requirements.txt")
     st.stop()
+
+# Apply thread limits at the torch level too (env vars alone don't always stick
+# once torch is loaded). Safe to call multiple times.
+try:
+    torch.set_num_threads(int(_NUM_THREADS))
+    torch.set_num_interop_threads(1)
+except RuntimeError:
+    # set_num_interop_threads must be called before any parallel work; if Streamlit
+    # already kicked off some torch ops on a previous rerun, this raises — ignore.
+    pass
 
 from opf import OPF
 
