@@ -205,7 +205,7 @@ def main() -> None:
         height=160,
     )
 
-    run = st.button("Redact", type="primary", use_container_width=False)
+    run = st.button("Redact", type="primary", width="content")
 
     # ---- Output ----
     if run:
@@ -227,7 +227,7 @@ def main() -> None:
             st.subheader("Detected spans")
             rows = spans_to_rows(getattr(result, "detected_spans", None), text)
             if rows:
-                st.dataframe(rows, use_container_width=True, hide_index=True)
+                st.dataframe(rows, width="stretch", hide_index=True)
             else:
                 st.info("（沒有偵測到 PII）")
 
