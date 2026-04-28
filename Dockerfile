@@ -16,12 +16,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Pre-download model weights into the image (~3 GB → /root/.opf/privacy_filter/).
-# HF_TOKEN is passed via BuildKit secret to avoid baking it into image layers
-# while still allowing authenticated downloads (much faster than anonymous).
+# HF_TOKEN is taken as a build ARG (Railway / plain `docker build` both support this).
+# Note: ARG values are visible in image build history; for a demo this is acceptable.
 # Build without a token also works, just slower and subject to HF rate limits.
-RUN --mount=type=secret,id=hf_token,required=false \
-    sh -c 'if [ -f /run/secrets/hf_token ]; then export HF_TOKEN="$(cat /run/secrets/hf_token)"; fi; \
-           python -c "from opf._common.checkpoint_download import ensure_default_checkpoint; ensure_default_checkpoint()"'
+ARG HF_TOKEN=""
+RUN HF_TOKEN="$HF_TOKEN" \
+    python -c "from opf._common.checkpoint_download import ensure_default_checkpoint; ensure_default_checkpoint()"
 
 COPY app.py demo.py ./
 

@@ -185,10 +185,8 @@ streamlit run app.py -- --device cuda
 模型權重會在 `docker build` 階段直接從 Hugging Face 下載進 image，**不需要先在本機 stage 任何檔案**。
 
 ```bash
-# 建議先把 HF_TOKEN 寫進 .hf_token（避免匿名速率限制，下載快非常多）
-echo -n "hf_xxxxxxxxxxxx" > .hf_token
-docker build --secret id=hf_token,src=.hf_token -t opf-demo .
-rm .hf_token
+# 建議先帶 HF_TOKEN 作為 build ARG（避免匿名速率限制，下載快非常多）
+docker build --build-arg HF_TOKEN=hf_xxxxxxxxxxxx -t opf-demo .
 
 # 或不設 token（會慢，但仍可運作）
 docker build -t opf-demo .
@@ -200,7 +198,7 @@ docker run --rm -p 8501:8501 opf-demo
 
 > 首次 build 約 10–20 分鐘：torch 安裝（~2 GB）+ 模型下載（~3 GB）。Build 完 image 約 5 GB；後續只改 `app.py` / `demo.py` 重 build 會命中 layer cache，幾秒內完成。
 >
-> Build secret 需要 BuildKit；Docker 24+ 與 Docker Desktop 預設啟用。若報錯可嘗試 `DOCKER_BUILDKIT=1 docker build ...`。
+> ⚠️ 用 `--build-arg` 傳 `HF_TOKEN`，token 會存在 image build history（不在最終 image 內，但能透過 `docker history` 看到）。對 demo 用途可接受；要更嚴謹請改用 BuildKit secret（本 Dockerfile 為相容 Railway 的 builder 沒採用）。
 
 ---
 
@@ -208,10 +206,11 @@ docker run --rm -p 8501:8501 opf-demo
 
 1. 在 [Railway](https://railway.app) 建立新 service，選「Deploy from GitHub」並連到本 repo（`main` branch）
 2. Railway 會自動偵測 `Dockerfile` 並開始 build；build 階段會把 ~3 GB 模型權重下載進 image
-3. **建議設定 HF_TOKEN build secret** 以避免匿名速率限制：
+3. **建議設定 HF_TOKEN build arg** 以避免匿名速率限制：
    - Service → Variables → 新增 `HF_TOKEN`，值為 [Hugging Face read token](https://huggingface.co/settings/tokens)
-   - Service → Settings → Build → 勾選 「Pass build args / secrets」並把 `HF_TOKEN` 加為 build secret（id: `hf_token`）
+   - Railway 會自動把 service variables 當成 build args 傳給 Dockerfile（`ARG HF_TOKEN`）
    - 沒設也能 build，只是會比較慢
+   - ⚠️ Railway 的 builder 不支援 BuildKit `--mount=type=secret`，所以本 Dockerfile 用 `ARG` 接 token；token 會留在 image build history 裡
 4. **Build 時間警告**：首次 build 約 10–20 分鐘；之後若只改程式碼會命中 layer cache、重 build 較快
 5. **記憶體警告 ⚠️**：1.5B 模型 RSS 約 6–7 GB
    - Railway **Hobby plan**（8 GB）會卡得很緊，可能 OOM
@@ -222,7 +221,7 @@ docker run --rm -p 8501:8501 opf-demo
 
 | 變數 | 階段 | 用途 |
 |---|---|---|
-| `HF_TOKEN` | **build only** | 透過 BuildKit secret 傳入；提速 + 避免 rate limit。runtime 不再需要 |
+| `HF_TOKEN` | **build only** | 透過 `--build-arg HF_TOKEN=...` 傳入（Railway service variable 會自動帶入）；提速 + 避免 rate limit。runtime 不再需要 |
 | `PORT` | runtime | Railway 自動注入；Streamlit 會綁這個 port |
 | `OPF_CHECKPOINT` | runtime（選用） | 預設 `/root/.opf/privacy_filter`（image 中已含權重）；除非要改路徑否則不用設 |
 
