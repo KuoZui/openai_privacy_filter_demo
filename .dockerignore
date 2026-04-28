@@ -1,0 +1,47 @@
+# Virtual environments (huge — would balloon build context)
+.venv/
+venv/
+env/
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Git / GitHub
+.git/
+.gitignore
+.github/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local secrets — never bake into the image
+.env
+.env.*
+.hf_token
+
+# Logs
+*.log
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Locally-staged model weights (not used by current Dockerfile;
+# excluded as a safety net so they never sneak into the build context)
+model_cache/
+
+# Demo plan artifacts (kept local to dev machine)
+plans/
